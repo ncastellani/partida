@@ -1,4 +1,4 @@
-module partida
+module github.com/ncastellani/partida
 
 go 1.19
 
