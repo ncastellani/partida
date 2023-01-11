@@ -127,13 +127,13 @@ func (c *Controller) handleRequest(r *Request) Response {
 // asd
 func (c *Controller) getCustomMessage(name string) map[string]string {
 
-	var actionMessage map[string]string
+	var msg map[string]string
 
-	if v, ok := c.customMessages[name]; ok {
-		actionMessage = v
+	if v, ok := c.messages[name]; ok {
+		msg = v
 	}
 
-	return actionMessage
+	return msg
 }
 
 // update the result on the request and "raise" an error if necessarily

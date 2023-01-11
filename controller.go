@@ -1,6 +1,8 @@
 package partida
 
-import "io"
+import (
+	"io"
+)
 
 type Backend interface {
 	PerformUserAuthorization(request *Request) error
@@ -8,25 +10,35 @@ type Backend interface {
 }
 
 type Controller struct {
-	PathCodes          string
-	PathActions        string
-	PathCustomMessages string
-
-	writer         io.Writer
-	backend        Backend
-	handlers       map[string]ActionHandler
-	validators     map[string]ActionValidator
-	codes          map[int]Code
-	actions        map[string]Action
-	customMessages map[string]map[string]string
+	writer     io.Writer
+	backend    Backend
+	handlers   map[string]ActionHandler
+	validators map[string]ActionValidator
+	codes      map[int]Code
+	actions    map[string]Action
+	messages   map[string]map[string]string
 }
 
-func New(bkd Backend, handlers map[string]ActionHandler, validators map[string]ActionValidator, writer io.Writer) *Controller {
+// create a new Controller based on the passed data
+func New(
+	bkd Backend,
+	handlers map[string]ActionHandler,
+	validators map[string]ActionValidator,
+	writer io.Writer,
+	actionsPath string,
+	codesPath string,
+	messagesPath string,
+) *Controller {
 	c := &Controller{
+		writer:     writer,
 		backend:    bkd,
 		handlers:   handlers,
 		validators: validators,
 	}
+
+	ParseJSON(actionsPath, &c.actions)
+	ParseJSON(codesPath, &c.codes)
+	ParseJSON(messagesPath, &c.messages)
 
 	return c
 }
