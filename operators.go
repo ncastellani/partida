@@ -6,43 +6,68 @@ import (
 	"reflect"
 	"strings"
 	"unicode/utf8"
-
-	"gopkg.in/guregu/null.v3"
 )
 
-// check if the action exists, HTTP method compatibility and network authorization
-func (r *Request) validateRequest(actions map[string]Action) error {
+// update the request result
+func (r *Request) updateResult(code, msg string, data interface{}) {
+	r.result = HandlerResponse{Code: code, CustomMessage: msg, Data: data}
+}
 
-	r.Logger.Println("starting up the general validations procedures")
+// check for content types at the accept header
+func (r *Request) determineAcceptedContentType() {
+	if val, ok := r.Headers["Accept"]; ok {
+		if val == "application/xml" && r.ContentType == "" {
+			r.Logger.Println("application/xml content type found on \"Accept\" header")
+			r.ContentType = "xml"
+		}
+	}
+}
 
-	// check if the requested API action/version exists
-	if v, ok := actions[r.path]; ok {
-		r.ActionName = null.NewString(r.path, true)
-		r.action = v
+// determine the requested route and resource
+func (r *Request) determineResource(routes *map[string]map[string]Resource) {
+	if r.result.Code != "OK" {
+		return
+	}
+
+	// check for route existence at the controller
+	if _, ok := (*routes)[r.Path]; !ok {
+		r.Logger.Printf("route not found [path: %v]", r.Path)
+		r.updateResult("GN100", "", Empty)
+		return
+	}
+
+	r.Logger.Printf("route exists. checking HTTP method for a resource [route: %v]", r.Path)
+
+	// check for route methods
+	if v, ok := (*routes)[r.Path][r.Method]; !ok {
+		r.Logger.Printf("method not available for this route [method: %v]", r.Method)
+
+		// return an OK response for OPTIONS verb validations
+		if r.Method == "OPTIONS" {
+			r.Logger.Printf("the current request is an OPTIONS check validation")
+			r.updateResult("GN101", "", Empty)
+			return
+		}
+
+		r.updateResult("GN102", "", Empty)
+		return
 	} else {
-		r.Logger.Printf("action not found [path: %v] [method: %v]", r.path, r.method)
-
-		return r.updateResult(5, "", Empty, nil)
+		r.resource = v
 	}
 
-	r.Logger.Printf("the requested action was selected [action: %v]", r.path)
+	r.Logger.Printf("resource exists. a valid HTTP method was used at this route, matching a resource [method: %v]", r.Method)
 
-	// check if the HTTP request method is acceptable by the action
-	if r.method == "OPTIONS" {
-		r.Logger.Printf("action called for OPTIONS method [action: %v]", r.ActionName.String)
+}
 
-		return r.updateResult(6, "", Empty, nil)
-	} else if r.method != r.action.Method {
-		r.Logger.Printf("action was called using an unsupported method [action: %v] [method: %v]", r.ActionName.String, r.method)
-
-		return r.updateResult(7, "", Empty, nil)
+// verify if the network data used by the requester is acceptable for this resource
+func (r *Request) verifyNetwork() {
+	if r.result.Code != "OK" {
+		return
 	}
-
-	r.Logger.Printf("a valid HTTP method for this action was used on this request [method: %v]", r.method)
 
 	// check if the current IP address pass the network policy
 	addrInExceptions := false
-	for _, v := range r.action.Network.Exception {
+	for _, v := range r.resource.Network.Exception {
 		_, IPrange, _ := net.ParseCIDR(v)
 		userAddr := net.ParseIP(r.IP)
 		if !addrInExceptions {
@@ -50,22 +75,23 @@ func (r *Request) validateRequest(actions map[string]Action) error {
 		}
 	}
 
-	if (r.action.Network.Command == "deny" && !addrInExceptions) || (r.action.Network.Command == "allow" && addrInExceptions) {
-		r.Logger.Printf("source IP for this request does not have access to this action [action: %v] [ip: %v]", r.ActionName.String, r.IP)
-
-		return r.updateResult(8, "", Empty, nil)
+	if (r.resource.Network.Default == "deny" && !addrInExceptions) || (r.resource.Network.Default == "allow" && addrInExceptions) {
+		r.Logger.Printf("resource does not allow this user IP [ip: %v]", r.IP)
+		r.updateResult("GN103", "", Empty)
+		return
 	}
 
-	r.Logger.Printf("this action is able to support the requester IP address [ip: %v]", r.IP)
-	r.Logger.Println("finished the general validations successfully")
+	r.Logger.Printf("resource supports the network data of this user [ip: %v]", r.IP)
 
-	return nil
 }
 
 // get the passed user token from the Authorization header
-func (r *Request) fetchUserToken() error {
+func (r *Request) extractAuthorizationToken() {
+	if r.result.Code != "OK" || !r.resource.Authentication {
+		return
+	}
 
-	r.Logger.Println("trying to fetch an token from the \"Authorization\" header")
+	r.Logger.Println("trying to fetch auth token from the 'Authorization' header")
 
 	// check if the header Authorization was passed
 	var token string
@@ -73,87 +99,118 @@ func (r *Request) fetchUserToken() error {
 	if v, ok := r.Headers["Authorization"]; ok {
 		token = v
 	} else {
-		r.Logger.Println("the \"Authorization\" header is not present or does not holds any content")
-
-		return r.updateResult(9, "", Empty, nil)
+		r.Logger.Println("'Authorization' header is not present or does not holds any content")
+		r.updateResult("GN104", "", Empty)
+		return
 	}
 
 	// get the second element of the authorization header
 	authHeader := strings.Fields(token)
 	if len(authHeader) == 1 {
 		r.Logger.Println("the \"Authorization\" header is present but does not use the correct format")
-
-		return r.updateResult(9, "handler.invalid_authorization_header", Empty, nil)
+		r.updateResult("GN105", "", Empty)
+		return
 	}
 
-	r.HeaderToken = authHeader[1]
+	r.ExtractedToken = authHeader[1]
 
-	r.Logger.Println("finished the fetch token from header operation")
+	r.Logger.Printf("sucessfully obtained the authorization token [token: ...%v]", r.ExtractedToken[len(r.ExtractedToken)-4:])
 
-	return nil
 }
 
-// !!
-func (r *Request) validateBodyParameters(validators map[string]ActionValidator) error {
+// call the user authorizer at the backend service
+func (r *Request) authorizeUser(be *Backend) {
+	if r.result.Code != "OK" || !r.resource.Authentication {
+		return
+	}
+
+	r.Logger.Println("calling the user authorizer at the backend service")
+
+	r.result = (*be).PerformUserAuthorization(r)
+
+}
+
+// extract and parse parameters from URL query and body payload
+func (r *Request) parsePayload() {
+	if r.result.Code != "OK" || len(r.resource.Parameters) == 0 {
+		return
+	}
+
+	r.Logger.Println("starting the parse of the request payload")
+
 	var err error
 
-	r.Logger.Println("starting the body validation procedures for this request")
+	// parse the parameters from the URL query
+	var queryKeys []string
+	queryParameters := make(map[string]interface{})
 
-	// keys and data recieved on input
-	var keys []string
-	parameters := make(map[string]interface{})
+	for k, v := range r.Query {
+		queryKeys = append(queryKeys, k)
+		queryParameters[k] = v[0]
+	}
 
-	// get the passed params from each source
-	if r.action.Method != "GET" {
-		// handle the params passed via ANY method except GET
+	// parse the body parameters
+	var bodyKeys []string
+	bodyParameters := make(map[string]interface{})
 
-		r.Logger.Println("the body parameters should be passed as JSON")
+	if len(r.Input) > 0 {
+		r.Logger.Println("this request got an body input")
 
-		// check if the recieved content is parseable to an inteface
-		err = json.Unmarshal(r.input, &parameters)
-		if err != nil {
-			return r.updateResult(104, "", Empty, nil)
+		// parse the input data into an interface
+		if r.ContentType == "json" {
+			err = json.Unmarshal(r.Input, &bodyParameters)
+			if err != nil {
+				r.updateResult("GN107", "", err)
+				return
+			}
+		} else {
+			r.updateResult("GN106", "", r.Headers["Accept"])
+			return
 		}
 
-		// check if the request body is an associative JSON
-		if !IsAssociative(parameters) {
-			return r.updateResult(105, "", Empty, nil)
+		// check if the inputted body is an associative map
+		if !IsAssociative(bodyParameters) {
+			r.updateResult("GN108", "", Empty)
+			return
 		}
 
 		// determine the keys passed on the body
-		for _, v := range reflect.ValueOf(parameters).MapKeys() {
-			keys = append(keys, v.String())
-		}
-
-	} else {
-		// handle the params passed via GET
-
-		r.Logger.Println("the body parameters should be passed on the URL as query")
-
-		// parse the recieved GET params to the body and keys
-		for k, v := range r.Query {
-			keys = append(keys, k)
-			parameters[k] = v[0]
+		for _, v := range reflect.ValueOf(bodyParameters).MapKeys() {
+			bodyKeys = append(bodyKeys, v.String())
 		}
 
 	}
 
-	// append the general type parameters !!
+	// validate the type of each resource parameter
+	parameters := make(map[string]interface{})
+	var missing []ResourceParameter
+	var invalid []ResourceParameter
 
-	// handle the action param validation
-	var missing []ActionParam
-	var invalid []ActionParam
-
-	for _, v := range r.action.Parameters {
+	for _, v := range r.resource.Parameters {
 
 		// check if the param is on the recieved keys
-		if !StringInSlice(v.Name, keys) {
-			missing = append(missing, v)
-			continue
+		var methodParams *map[string]interface{}
+
+		if v.QueryParameter {
+			if !StringInSlice(v.Name, queryKeys) {
+				missing = append(missing, v)
+				r.Logger.Printf("parameter missing at the URL query [param: %v]", v.Name)
+				continue
+			}
+
+			methodParams = &queryParameters
+		} else {
+			if !StringInSlice(v.Name, bodyKeys) {
+				missing = append(missing, v)
+				r.Logger.Printf("parameter missing at the body payload [param: %v]", v.Name)
+				continue
+			}
+
+			methodParams = &bodyParameters
 		}
 
 		// check if the informed value is of required type
-		switch parameters[v.Name].(type) {
+		switch (*methodParams)[v.Name].(type) {
 		case string:
 			if v.Kind != "string" && v.Kind != "enum" {
 				invalid = append(invalid, v)
@@ -180,7 +237,7 @@ func (r *Request) validateBodyParameters(validators map[string]ActionValidator) 
 				continue
 			}
 		default:
-			if parameters[v.Name] != nil && v.Required {
+			if (*methodParams)[v.Name] != nil && v.Required {
 				invalid = append(invalid, v)
 				continue
 			}
@@ -188,22 +245,29 @@ func (r *Request) validateBodyParameters(validators map[string]ActionValidator) 
 
 		// perform param data check for the "enum" type
 		if v.Kind == "enum" {
-			if !StringInSlice(parameters[v.Name].(string), v.Options) {
+			if !StringInSlice((*methodParams)[v.Name].(string), v.Options) {
 				invalid = append(invalid, v)
+				r.Logger.Printf("parameter got an value that does not match the ENUM available ones [param: %v] [recieved: %v]", v.Name, (*methodParams)[v.Name].(string))
 				continue
 			}
 		}
 
 		// perform param data check for the "string" type
-		if v.Kind == "string" && parameters[v.Name] != nil {
+		if v.Kind == "string" && (*methodParams)[v.Name] != nil {
 
 			// check the length of the recived data
-			if v.MaxLength != 0 && (utf8.RuneCountInString(parameters[v.Name].(string)) > v.MaxLength) {
+			if v.MaxLength != 0 && (utf8.RuneCountInString((*methodParams)[v.Name].(string)) > v.MaxLength) {
 				invalid = append(invalid, v)
+				r.Logger.Printf("parameter surpass the max length for string [param: %v] [maxLength: %v]", v.Name, v.MaxLength)
 				continue
 			}
 
 		}
+
+		// append this value into the parameters section
+		parameters[v.Name] = (*methodParams)[v.Name]
+
+		r.Logger.Printf("sucessfully extracted and parsed parameter [parameter: %v]", v.Name)
 
 	}
 
@@ -211,84 +275,113 @@ func (r *Request) validateBodyParameters(validators map[string]ActionValidator) 
 	if len(invalid) > 0 || len(missing) > 0 {
 		r.Logger.Printf("this request has invalid or missing parameters [invalid: %v] [missing: %v]", len(invalid), len(missing))
 
-		return r.updateResult(10, "", struct {
-			Missing []ActionParam `json:"missing"`
-			Invalid []ActionParam `json:"invalid"`
+		r.updateResult("GN109", "", struct {
+			Missing *[]ResourceParameter `json:"missing"`
+			Invalid *[]ResourceParameter `json:"invalid"`
 		}{
-			Missing: missing,
-			Invalid: invalid,
-		}, nil)
+			Missing: &missing,
+			Invalid: &invalid,
+		})
+
+		return
 	}
 
 	// assign the parsed body on the request
-	r.Parameters = parameters
+	r.Parameters = &parameters
 
-	// perform the action validators validations
-	for _, v := range r.action.Parameters {
+	r.Logger.Printf("sucessfully parsed parameters from the URL query and body payload [available: %v]", len(*r.Parameters))
+
+}
+
+// call the parameter validator function for each parameter at the resource
+func (r *Request) validateResourceParameters(validators *map[string]ParameterValidator) {
+	if r.result.Code != "OK" || len(r.resource.Parameters) == 0 {
+		return
+	}
+
+	r.Logger.Println("starting the resource parameters validations")
+
+	// perform the resource params validations
+	for _, v := range r.resource.Parameters {
 		for _, validator := range v.Validators {
 
-			// convert the parameter to string
-			var paramValue string
+			// call the parameter validator
+			res := (*validators)[validator]((*r.Parameters)[v.Name], r)
 
-			switch parameters[v.Name].(type) {
-			case string:
-				paramValue = r.Parameters[v.Name].(string)
-			case interface{}:
-				paramValue = ""
-			default:
-				paramValue = ""
-			}
+			// handle validator errors
+			if res.Code != "OK" {
+				r.Logger.Printf("parameter validation failed [param: %v] [validator: %v] [returnedCode: %v] [err: %v]", v.Name, validator, res.Code, res.Data)
 
-			// check if the parameter was passed
-			if paramValue == "" {
-				continue
-			}
-
-			// perform the validation
-			msg, code := validators[validator](paramValue, r)
-
-			r.Logger.Printf("performed parameter check on action validator [paramName: %v] [validator: %v] [result: %v]", v.Name, validator, code)
-
-			if code != 0 {
-				return r.updateResult(code, msg, struct {
-					Parameter ActionParam `json:"parameter"`
-					Input     string      `json:"input"`
+				r.updateResult(res.Code, res.CustomMessage, struct {
+					Parameter     ResourceParameter `json:"parameter"`
+					Input         interface{}       `json:"input"`
+					ValidatorData interface{}       `json:"error"`
 				}{
-					Parameter: v,
-					Input:     paramValue,
-				}, nil)
+					Parameter:     v,
+					Input:         (*r.Parameters)[v.Name],
+					ValidatorData: res.Data,
+				})
+
+				return
 			}
+
+			r.Logger.Printf("parameter validation passed [param: %v] [validator: %v]", v.Name, validator)
 
 		}
 	}
 
-	r.Logger.Println("successfully validated the passed data for body parameters")
+	r.Logger.Println("successfully validated parameters for this resource")
 
-	return nil
 }
 
-// execute the action function responsible specified on the actionHandlers variable
-func (r *Request) callMethod(handlers map[string]ActionHandler) error {
-
-	// check if the action function exists
-	if _, ok := handlers[r.path]; !ok {
-		r.Logger.Println("the action method function does not exists at the handlers map (ActionHandler)")
-
-		return r.updateResult(3, "", r.action, nil)
+// call the backend pre execution function to perform backend logic
+func (r *Request) callBackendPreExecution(be *Backend) {
+	if r.result.Code != "OK" {
+		return
 	}
 
-	// handle the panic on the function call
+	r.Logger.Println("calling the PRE exection operation function at backend service")
+
+	r.result = (*be).PerformPreExecutionOperations(r)
+
+}
+
+// call the resource method function
+func (r *Request) callMethod(methods *map[string]ResourceMethod) {
+
+	// check if the resource method function exists
+	if _, ok := (*methods)[r.resource.ResourceMethod]; !ok {
+		r.Logger.Println("resource method function does not exists at the handlers map")
+		r.updateResult("GN2", "", r.resource.ResourceMethod)
+		return
+	}
+
+	r.Logger.Println("-- executing resource method --")
+
+	// handle panic at function call
 	defer func() {
 		if rcv := recover(); rcv != nil {
-			r.Logger.Printf("the action method function got into a panic [err: %v]", rcv)
-
-			r.result = RequestResponse{1, "", Empty}
+			r.Logger.Printf("resource method function panicked [err: %v]", rcv)
+			r.result = HandlerResponse{"GN1", "", rcv}
 		}
 	}()
 
-	r.result = handlers[r.path](r)
+	r.result = (*methods)[r.resource.ResourceMethod](r)
 
-	r.Logger.Println("sucessfully executed the action method function")
+	r.Logger.Println("-- resource method execution ended --")
 
-	return nil
+	r.Logger.Println("sucessfully executed the resource method function")
+
+}
+
+// call the backend post execution function to perform backend logic
+func (r *Request) callBackendPostExecution(be *Backend) {
+	if r.result.Code != "OK" {
+		return
+	}
+
+	r.Logger.Println("calling the POST exection operation function at backend service")
+
+	r.result = (*be).PerformPostExecutionOperations(r)
+
 }

@@ -1,9 +1,5 @@
 module github.com/ncastellani/partida
 
-go 1.19
+go 1.20
 
-require (
-	github.com/aws/aws-lambda-go v1.36.1
-	github.com/google/uuid v1.3.0
-	gopkg.in/guregu/null.v3 v3.5.0
-)
+require github.com/aws/aws-lambda-go v1.37.0

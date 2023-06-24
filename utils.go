@@ -2,13 +2,15 @@ package partida
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
+	"time"
 )
 
-// an empty interface literal type, used to pass null as a parameter
+// Empty is a empty interface literal type to pass null as a parameter
 var Empty interface{}
 
-// parse a JSON file to an interface
+// ParseJSON parse a JSON file to an interface
 func ParseJSON(path string, data interface{}) {
 	var err error
 
@@ -26,7 +28,7 @@ func ParseJSON(path string, data interface{}) {
 
 }
 
-// check if the informed interface is an map
+// IsAssociative check if the informed interface is an map
 func IsAssociative(v interface{}) bool {
 	var is bool
 	switch v.(type) {
@@ -38,7 +40,7 @@ func IsAssociative(v interface{}) bool {
 	return is
 }
 
-// check if the informed string is on the slice
+// StringInSlice check if the informed string is on the slice
 func StringInSlice(a string, list []string) bool {
 	for _, b := range list {
 		if b == a {
@@ -46,4 +48,17 @@ func StringInSlice(a string, list []string) bool {
 		}
 	}
 	return false
+}
+
+// RandomString generate a random string of the passed length
+func RandomString(length int) string {
+	charset := "abcdefghijklmnopqrstuvwxyz0123456789"
+	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+
+	return string(b)
 }

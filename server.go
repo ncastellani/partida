@@ -7,10 +7,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/google/uuid"
 )
 
-// handle an inbound HTTP request (via Golang standard HTTP lib)
+// HandlerForHTTP handle an inbound HTTP request (via Golang standard HTTP lib)
 func (c *Controller) HandlerForHTTP(w http.ResponseWriter, e *http.Request) {
 
 	// get the request input body
@@ -42,18 +41,19 @@ func (c *Controller) HandlerForHTTP(w http.ResponseWriter, e *http.Request) {
 
 	// assemble and perform the request validation and method
 	r := Request{
-		ID: uuid.New().String(),
-
+		ID:      RandomString(10),
 		IP:      ip,
 		Query:   queryParams,
 		Headers: headers,
-
-		method: e.Method,
-		path:   path,
-		input:  input,
+		Method:  e.Method,
+		Path:    path,
+		Input:   input,
 	}
 
 	res := c.handleRequest(&r)
+
+	// append the request ID
+	res.Headers["x-request-id"] = r.ID
 
 	// set the response headers on the request
 	for k, v := range res.Headers {
@@ -68,37 +68,39 @@ func (c *Controller) HandlerForHTTP(w http.ResponseWriter, e *http.Request) {
 
 }
 
-// handle an inbound AWS Lambda request (via API Gateway v2)
+// HandlerForAWSLambda handle an inbound AWS Lambda request (via API Gateway v2)
 func (c *Controller) HandlerForAWSLambda(e events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 
 	// generate the request with the relevant data
 	r := Request{
-		ID: e.RequestContext.RequestID,
-
-		method:  e.RequestContext.HTTP.Method,
+		ID:      e.RequestContext.RequestID,
 		IP:      e.RequestContext.HTTP.SourceIP,
+		Method:  e.RequestContext.HTTP.Method,
 		Query:   e.QueryStringParameters,
 		Headers: e.Headers,
 	}
 
 	// parse the path for getting the action
+	r.Path = "index"
+
 	if e.RawPath != "/" {
-		r.path = e.RawPath[1:]
-	} else {
-		r.path = "index"
+		r.Path = e.RawPath[1:]
 	}
 
 	// get the request input body also handling Base64 encoded bodies
 	if e.IsBase64Encoded {
-		r.input, _ = base64.StdEncoding.DecodeString(e.Body)
+		r.Input, _ = base64.StdEncoding.DecodeString(e.Body)
 	} else {
-		r.input = []byte(e.Body)
+		r.Input = []byte(e.Body)
 	}
 
 	// assemble and perform the request validation and method
 	res := c.handleRequest(&r)
 
 	r.Logger.Println("")
+
+	// append the request ID
+	res.Headers["x-request-id"] = r.ID
 
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: res.HTTPCode,

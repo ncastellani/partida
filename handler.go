@@ -6,153 +6,95 @@ import (
 	"fmt"
 	"log"
 	"time"
-
-	"gopkg.in/guregu/null.v3"
 )
 
-// data format response for an action function return
-type RequestResponse struct {
-	Code          int         // return operation code
+// HandlerResponse for the general method response structure
+type HandlerResponse struct {
+	Code          string      // return operation code
 	CustomMessage string      // custom action return message
 	Data          interface{} // operation generated data
 }
 
-// relevant request data assembled by HTTP handler
-type Request struct {
-
-	// general request information
-	ID          string      // request identifier for debug
-	Logger      *log.Logger // an logger instance
-	ContentType string      // in which format the response should be returned json/xml
-
-	// protocol level
-	IP      string            // end-user IP address
-	Query   map[string]string // GET method query parameters
-	Headers map[string]string // request HTTP headers
-
-	path   string // request path with the action name
-	method string // HTTP request method
-	input  []byte // request input data
-
-	// handler level
-	ActionName  null.String            // action name
-	Parameters  map[string]interface{} // parsed informed data
-	HeaderToken string                 // !!!
-
-	result RequestResponse // action handler result
-	action Action          // complete action data
-
+// Code for the application default response messages and HTTP codes
+type Code struct {
+	HTTPCode int               `json:"http"`    // HTTP return code
+	Message  map[string]string `json:"message"` // messages from the code
 }
 
-// data to be returned to the user by the HTTP handler
+// Response for the data to be returned to the user by the HTTP handler
 type Response struct {
 	HTTPCode int               // HTTP response code of the result
 	Content  []byte            // response content
 	Headers  map[string]string // response headers
 }
 
-// structure of the metadata used on API responses
+// ResponseMeta is the structure of the metadata used on API responses
 type ResponseMeta struct {
-	ID            string            `json:"id"`         // request identifier for debug
-	Time          time.Time         `json:"time"`       // request answered when
-	Code          int               `json:"code"`       // API response code
-	Action        null.String       `json:"action"`     // responsible action
-	Message       map[string]string `json:"message"`    // response code messages
-	CustomMessage map[string]string `json:"op_message"` // the message returned by the action
+	Code          string            `json:"code"`             // API response code
+	Message       map[string]string `json:"message"`          // response code messages
+	ID            string            `json:"id"`               // request identifier for debug
+	Time          time.Time         `json:"time"`             // request answered datetime
+	CustomMessage map[string]string `json:"resource_message"` // the message returned by the resource
 }
 
-// call all the validators and action function for the requested action
+// Request is the structure for the request metadata, payload and useful contents
+type Request struct {
+	ID          string // request identifier for debugging
+	ContentType string // format of the response (json or xml), default = json
+
+	Logger    *log.Logger // general request logging
+	ErrLogger *log.Logger // request error logging
+
+	IP      string            // request initiator IP address
+	Query   map[string]string // GET method query parameters
+	Headers map[string]string // request HTTP headers
+	Path    string            // requested path
+	Method  string            // HTTP request verb
+	Input   []byte            // input data
+
+	ExtractedToken string                  // token fetched from the Authorization header
+	Parameters     *map[string]interface{} // parsed parameters
+
+	resource Resource        // resource data
+	result   HandlerResponse // resource handler result
+
+}
+
+// call the request validation methods and the resource function
 func (c *Controller) handleRequest(r *Request) Response {
-	var err error
 
-	r.Logger = log.New(c.writer, fmt.Sprintf("REQ [%v] ", r.ID), log.LstdFlags|log.Lmsgprefix)
-	r.Logger.Printf("handler initiated [path: %v] [method: %v] [ip: %v]", r.path, r.method, r.IP)
+	// generate the loggers for this request
+	r.ErrLogger = log.New(c.errorWriter, fmt.Sprintf("%v(%v) ERROR > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
+	r.Logger = log.New(c.standardWriter, fmt.Sprintf("%v(%v) > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
 
-	// perform the general request verifications
-	err = r.validateRequest(c.actions)
-	if err != nil {
-		return c.makeResponse(r)
-	}
+	r.Logger.Printf("request recieved [method: %v] [ip: %v]", r.Method, r.IP)
 
-	// perform the user authentication and authorization
-	if r.action.Authentication {
+	// set the default contentType
+	r.ContentType = "json"
 
-		r.Logger.Println("this action require authentication")
-
-		// fetch the token passed on the Authorization header
-		err = r.fetchUserToken()
-		if err != nil {
-			return c.makeResponse(r)
+	// handle panic at request operators calls
+	defer func() {
+		if rcv := recover(); rcv != nil {
+			r.Logger.Printf("request operator panicked [err: %v]", rcv)
+			r.result = HandlerResponse{"GN1", "", rcv}
 		}
+	}()
 
-		// fetch the token data based on the passed header
-		err = c.backend.PerformUserAuthorization(r)
-		if err != nil {
-			// !! handle error
-			return c.makeResponse(r)
-		}
-
-	}
-
-	// check the input data for body params (query/post)
-	if len(r.action.Parameters) > 0 {
-
-		r.Logger.Println("this action require body parameters")
-
-		// fetch the token data based on the passed header
-		err = r.validateBodyParameters(c.validators)
-		if err != nil {
-			return c.makeResponse(r)
-		}
-
-	}
-
-	// execute the action method function
-	err = r.callMethod(c.handlers)
-	if err != nil {
-		return c.makeResponse(r)
-	}
-
-	// call the backend post execution function
-	err = c.backend.PerformPostExecutionOperations(r)
-	if err != nil {
-		return c.makeResponse(r)
-	}
+	// call the request operators
+	r.determineAcceptedContentType()
+	r.determineResource(&c.routes)
+	r.verifyNetwork()
+	r.extractAuthorizationToken()
+	r.authorizeUser(&c.backend)
+	r.parsePayload()
+	r.validateResourceParameters(&c.validators)
+	r.callBackendPreExecution(&c.backend)
+	r.callMethod(&c.methods)
+	r.callBackendPostExecution(&c.backend)
 
 	r.Logger.Printf("finished the request handler job")
 
 	return c.makeResponse(r)
-}
-
-// asd
-func (c *Controller) getCustomMessage(name string) map[string]string {
-
-	var msg map[string]string
-
-	if v, ok := c.messages[name]; ok {
-		msg = v
-	}
-
-	return msg
-}
-
-// update the result on the request and "raise" an error if necessarily
-func (r *Request) updateResult(code int, msg string, data interface{}, err error) error {
-
-	// update the request result
-	r.result = RequestResponse{Code: code, CustomMessage: msg, Data: data}
-
-	// in case an error has been passed, do a "raise"
-	if err != nil {
-		return err
-	}
-
-	// in case the new API code is not 0 (unsuccessful), do a "raise"
-	if code != 0 {
-		return ErrRequestHandlerUnsuccessful
-	}
-
-	return nil
 }
 
 // return an HTTP response for the current request result
@@ -161,19 +103,15 @@ func (c *Controller) makeResponse(r *Request) Response {
 
 	r.Logger.Printf("starting the response assemble [code: %v] [customMessage: %v]", r.result.Code, r.result.CustomMessage)
 
-	// infer the desired Accept response type if no content-type is already set
-	if val, ok := r.Headers["Accept"]; ok {
-		if val == "application/xml" && r.ContentType == "" {
-			r.Logger.Println("application/xml content type found on \"Accept\" header")
-			r.ContentType = "xml"
-		}
-	}
-
 	// check if the response code exists and fetch its data
-	codeData := c.codes[1]
+	code := generalCodes["GN3"]
 
 	if v, ok := c.codes[r.result.Code]; ok {
-		codeData = v
+		code = v
+	} else {
+		if v, ok := generalCodes[r.result.Code]; ok {
+			code = v
+		}
 	}
 
 	// get the custom message
@@ -191,7 +129,7 @@ func (c *Controller) makeResponse(r *Request) Response {
 
 	if r.ContentType == "xml" {
 		headers["Content-Type"] = "application/xml"
-		r.Logger.Println("this response will be return as XML")
+		r.Logger.Println("this response will be returned as XML")
 	}
 
 	// assemble the request response with the code and provided data
@@ -201,15 +139,14 @@ func (c *Controller) makeResponse(r *Request) Response {
 		Data    interface{}  `json:"data" xml:"data"`
 	}{
 		XMLName: xml.Name{Local: "response"},
+		Data:    r.result.Data,
 		Meta: ResponseMeta{
 			ID:            r.ID,
 			Time:          time.Now(),
 			Code:          r.result.Code,
-			Action:        r.ActionName,
-			Message:       codeData.Message,
+			Message:       code.Message,
 			CustomMessage: customMsg,
 		},
-		Data: r.result.Data,
 	}
 
 	// perform the XML/JSON marshaling of the response
@@ -223,10 +160,19 @@ func (c *Controller) makeResponse(r *Request) Response {
 
 	if err != nil {
 		r.Logger.Fatalf("error while marshaling JSON/XML with response [err: %v]", err)
-		return Response{HTTPCode: c.codes[1].HTTPCode, Content: []byte{}, Headers: nil}
+		return Response{HTTPCode: generalCodes["GN4"].HTTPCode, Content: []byte{}, Headers: nil}
 	}
 
-	r.Logger.Println("API format response assembled for HTTP return")
+	r.Logger.Println("API response assembled. returning HTTP response")
 
-	return Response{HTTPCode: codeData.HTTPCode, Content: content, Headers: headers}
+	return Response{HTTPCode: code.HTTPCode, Content: content, Headers: headers}
+}
+
+// return the message values for the passed key
+func (c *Controller) getCustomMessage(key string) (msg map[string]string) {
+	if v, ok := c.messages[key]; ok {
+		msg = v
+	}
+
+	return msg
 }
