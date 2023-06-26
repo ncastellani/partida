@@ -10,7 +10,7 @@ import (
 
 // update the request result
 func (r *Request) updateResult(code, msg string, data interface{}) {
-	r.result = HandlerResponse{Code: code, CustomMessage: msg, Data: data}
+	r.Result = HandlerResponse{Code: code, CustomMessage: msg, Data: data}
 }
 
 // check for content types at the accept header
@@ -25,7 +25,7 @@ func (r *Request) determineAcceptedContentType() {
 
 // determine the requested route and resource
 func (r *Request) determineResource(routes *map[string]map[string]Resource) {
-	if r.result.Code != "OK" {
+	if r.Result.Code != "OK" {
 		return
 	}
 
@@ -52,7 +52,7 @@ func (r *Request) determineResource(routes *map[string]map[string]Resource) {
 		r.updateResult("GN102", "", Empty)
 		return
 	} else {
-		r.resource = v
+		r.Resource = v
 	}
 
 	r.Logger.Printf("resource exists. a valid HTTP method was used at this route, matching a resource [method: %v]", r.Method)
@@ -61,13 +61,13 @@ func (r *Request) determineResource(routes *map[string]map[string]Resource) {
 
 // verify if the network data used by the requester is acceptable for this resource
 func (r *Request) verifyNetwork() {
-	if r.result.Code != "OK" {
+	if r.Result.Code != "OK" {
 		return
 	}
 
 	// check if the current IP address pass the network policy
 	addrInExceptions := false
-	for _, v := range r.resource.Network.Exception {
+	for _, v := range r.Resource.Network.Exception {
 		_, IPrange, _ := net.ParseCIDR(v)
 		userAddr := net.ParseIP(r.IP)
 		if !addrInExceptions {
@@ -75,7 +75,7 @@ func (r *Request) verifyNetwork() {
 		}
 	}
 
-	if (r.resource.Network.Default == "deny" && !addrInExceptions) || (r.resource.Network.Default == "allow" && addrInExceptions) {
+	if (r.Resource.Network.Default == "deny" && !addrInExceptions) || (r.Resource.Network.Default == "allow" && addrInExceptions) {
 		r.Logger.Printf("resource does not allow this user IP [ip: %v]", r.IP)
 		r.updateResult("GN103", "", Empty)
 		return
@@ -87,7 +87,7 @@ func (r *Request) verifyNetwork() {
 
 // get the passed user token from the Authorization header
 func (r *Request) extractAuthorizationToken() {
-	if r.result.Code != "OK" || !r.resource.Authentication {
+	if r.Result.Code != "OK" || !r.Resource.Authentication {
 		return
 	}
 
@@ -120,19 +120,19 @@ func (r *Request) extractAuthorizationToken() {
 
 // call the user authorizer at the backend service
 func (r *Request) authorizeUser(be *Backend) {
-	if r.result.Code != "OK" || !r.resource.Authentication {
+	if r.Result.Code != "OK" || !r.Resource.Authentication {
 		return
 	}
 
 	r.Logger.Println("calling the user authorizer at the backend service")
 
-	r.result = (*be).PerformUserAuthorization(r)
+	r.Result = (*be).PerformUserAuthorization(r)
 
 }
 
 // extract and parse parameters from URL query and body payload
 func (r *Request) parsePayload() {
-	if r.result.Code != "OK" || len(r.resource.Parameters) == 0 {
+	if r.Result.Code != "OK" || len(r.Resource.Parameters) == 0 {
 		return
 	}
 
@@ -186,7 +186,7 @@ func (r *Request) parsePayload() {
 	var missing []ResourceParameter
 	var invalid []ResourceParameter
 
-	for _, v := range r.resource.Parameters {
+	for _, v := range r.Resource.Parameters {
 
 		// check if the param is on the recieved keys
 		var methodParams *map[string]interface{}
@@ -295,14 +295,14 @@ func (r *Request) parsePayload() {
 
 // call the parameter validator function for each parameter at the resource
 func (r *Request) validateResourceParameters(validators *map[string]ParameterValidator) {
-	if r.result.Code != "OK" || len(r.resource.Parameters) == 0 {
+	if r.Result.Code != "OK" || len(r.Resource.Parameters) == 0 {
 		return
 	}
 
 	r.Logger.Println("starting the resource parameters validations")
 
 	// perform the resource params validations
-	for _, v := range r.resource.Parameters {
+	for _, v := range r.Resource.Parameters {
 		for _, validator := range v.Validators {
 
 			// call the parameter validator
@@ -336,23 +336,26 @@ func (r *Request) validateResourceParameters(validators *map[string]ParameterVal
 
 // call the backend pre execution function to perform backend logic
 func (r *Request) callBackendPreExecution(be *Backend) {
-	if r.result.Code != "OK" {
+	if r.Result.Code != "OK" {
 		return
 	}
 
 	r.Logger.Println("calling the PRE exection operation function at backend service")
 
-	r.result = (*be).PerformPreExecutionOperations(r)
+	r.Result = (*be).PerformPreExecutionOperations(r)
 
 }
 
 // call the resource method function
 func (r *Request) callMethod(methods *map[string]ResourceMethod) {
+	if r.Result.Code != "OK" {
+		return
+	}
 
 	// check if the resource method function exists
-	if _, ok := (*methods)[r.resource.ResourceMethod]; !ok {
+	if _, ok := (*methods)[r.Resource.ResourceMethod]; !ok {
 		r.Logger.Println("resource method function does not exists at the handlers map")
-		r.updateResult("GN2", "", r.resource.ResourceMethod)
+		r.updateResult("GN2", "", r.Resource.ResourceMethod)
 		return
 	}
 
@@ -362,11 +365,11 @@ func (r *Request) callMethod(methods *map[string]ResourceMethod) {
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			r.Logger.Printf("resource method function panicked [err: %v]", rcv)
-			r.result = HandlerResponse{"GN1", "", rcv}
+			r.Result = HandlerResponse{"GN1", "", rcv}
 		}
 	}()
 
-	r.result = (*methods)[r.resource.ResourceMethod](r)
+	r.Result = (*methods)[r.Resource.ResourceMethod](r)
 
 	r.Logger.Println("-- resource method execution ended --")
 
@@ -376,12 +379,12 @@ func (r *Request) callMethod(methods *map[string]ResourceMethod) {
 
 // call the backend post execution function to perform backend logic
 func (r *Request) callBackendPostExecution(be *Backend) {
-	if r.result.Code != "OK" {
+	if r.Result.Code != "OK" {
 		return
 	}
 
 	r.Logger.Println("calling the POST exection operation function at backend service")
 
-	r.result = (*be).PerformPostExecutionOperations(r)
+	r.Result = (*be).PerformPostExecutionOperations(r)
 
 }

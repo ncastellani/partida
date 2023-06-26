@@ -14,11 +14,8 @@ type Backend interface {
 }
 
 type Controller struct {
-	backend Backend // backend service
-
-	// writers for logging
-	standardWriter io.Writer
-	errorWriter    io.Writer
+	backend Backend   // backend service
+	writer  io.Writer // logger writer
 
 	// responses and routes
 	codes    map[string]Code
@@ -33,9 +30,7 @@ type Controller struct {
 func NewController(bkd Backend) *Controller {
 	return &Controller{
 		backend: bkd,
-
-		standardWriter: log.Default().Writer(),
-		errorWriter:    log.Default().Writer(),
+		writer:  log.Default().Writer(),
 	}
 }
 
@@ -50,7 +45,6 @@ func (c *Controller) SetMethods(validators *map[string]ParameterValidator, metho
 	c.methods = methods
 }
 
-func (c *Controller) SetWriters(standardWriter, errorWriter io.Writer) {
-	c.standardWriter = standardWriter
-	c.errorWriter = errorWriter
+func (c *Controller) SetWriter(writer io.Writer) {
+	c.writer = writer
 }

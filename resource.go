@@ -12,7 +12,7 @@ type Resource struct {
 type ResourceParameter struct {
 	QueryParameter bool     `json:"query_parameter"`
 	Name           string   `json:"name"`       // parameter name
-	Kind           string   `json:"kind"`       // parameter type (string/int/enum)
+	Kind           string   `json:"kind"`       // parameter type (string/number/enum)
 	Required       bool     `json:"required"`   // is required
 	MaxLength      int      `json:"max_length"` // max length of the string (0 for none)
 	Options        []string `json:"options"`    // if type enum, what are the options?

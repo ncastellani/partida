@@ -39,11 +39,9 @@ type ResponseMeta struct {
 
 // Request is the structure for the request metadata, payload and useful contents
 type Request struct {
-	ID          string // request identifier for debugging
-	ContentType string // format of the response (json or xml), default = json
-
-	Logger    *log.Logger // general request logging
-	ErrLogger *log.Logger // request error logging
+	ID          string      // request identifier
+	ContentType string      // format of the response (json or xml) default = json
+	Logger      *log.Logger // general request logging
 
 	IP      string            // request initiator IP address
 	Query   map[string]string // GET method query parameters
@@ -54,18 +52,15 @@ type Request struct {
 
 	ExtractedToken string                  // token fetched from the Authorization header
 	Parameters     *map[string]interface{} // parsed parameters
-
-	resource Resource        // resource data
-	result   HandlerResponse // resource handler result
-
+	Resource       Resource                // resource data
+	Result         HandlerResponse         // resource handler result
 }
 
 // call the request validation methods and the resource function
 func (c *Controller) handleRequest(r *Request) Response {
 
-	// generate the loggers for this request
-	r.ErrLogger = log.New(c.errorWriter, fmt.Sprintf("%v(%v) ERROR > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
-	r.Logger = log.New(c.standardWriter, fmt.Sprintf("%v(%v) > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
+	// generate the logger for this request
+	r.Logger = log.New(c.writer, fmt.Sprintf("%v(%v) > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
 
 	r.Logger.Printf("request recieved [method: %v] [ip: %v]", r.Method, r.IP)
 
@@ -76,12 +71,12 @@ func (c *Controller) handleRequest(r *Request) Response {
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			r.Logger.Printf("request operator panicked [err: %v]", rcv)
-			r.result = HandlerResponse{"GN1", "", rcv}
+			r.Result = HandlerResponse{"GN1", "", rcv}
 		}
 	}()
 
 	// set the request result as OK
-	r.result = HandlerResponse{Code: "OK", Data: Empty}
+	r.Result = HandlerResponse{Code: "OK", Data: Empty}
 
 	// call the request operators
 	r.determineAcceptedContentType()
@@ -104,21 +99,21 @@ func (c *Controller) handleRequest(r *Request) Response {
 func (c *Controller) makeResponse(r *Request) Response {
 	var err error
 
-	r.Logger.Printf("starting the response assemble [code: %v] [customMessage: %v]", r.result.Code, r.result.CustomMessage)
+	r.Logger.Printf("starting the response assemble [code: %v] [customMessage: %v]", r.Result.Code, r.Result.CustomMessage)
 
 	// check if the response code exists and fetch its data
 	code := generalCodes["GN3"]
 
-	if v, ok := c.codes[r.result.Code]; ok {
+	if v, ok := c.codes[r.Result.Code]; ok {
 		code = v
 	} else {
-		if v, ok := generalCodes[r.result.Code]; ok {
+		if v, ok := generalCodes[r.Result.Code]; ok {
 			code = v
 		}
 	}
 
 	// get the custom message
-	customMsg := c.getCustomMessage(r.result.CustomMessage)
+	customMsg := c.getCustomMessage(r.Result.CustomMessage)
 
 	// set the CORS, CACHE and content type headers
 	var headers map[string]string = map[string]string{
@@ -142,11 +137,11 @@ func (c *Controller) makeResponse(r *Request) Response {
 		Data    interface{}  `json:"data" xml:"data"`
 	}{
 		XMLName: xml.Name{Local: "response"},
-		Data:    r.result.Data,
+		Data:    r.Result.Data,
 		Meta: ResponseMeta{
 			ID:            r.ID,
 			Time:          time.Now(),
-			Code:          r.result.Code,
+			Code:          r.Result.Code,
 			Message:       code.Message,
 			CustomMessage: customMsg,
 		},
