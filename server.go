@@ -64,7 +64,7 @@ func (c *Controller) HandlerForHTTP(w http.ResponseWriter, e *http.Request) {
 	w.WriteHeader(res.HTTPCode)
 	w.Write(res.Content)
 
-	r.Logger.Println("")
+	r.Logger.Println("DONE")
 
 }
 
@@ -97,7 +97,7 @@ func (c *Controller) HandlerForAWSLambda(e events.APIGatewayV2HTTPRequest) (even
 	// assemble and perform the request validation and method
 	res := c.handleRequest(&r)
 
-	r.Logger.Println("")
+	r.Logger.Println("DONE")
 
 	// append the request ID
 	res.Headers["x-request-id"] = r.ID

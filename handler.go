@@ -80,6 +80,9 @@ func (c *Controller) handleRequest(r *Request) Response {
 		}
 	}()
 
+	// set the request result as OK
+	r.result = HandlerResponse{Code: "OK", Data: Empty}
+
 	// call the request operators
 	r.determineAcceptedContentType()
 	r.determineResource(&c.routes)
