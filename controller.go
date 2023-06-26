@@ -26,8 +26,8 @@ type Controller struct {
 	messages map[string]map[string]string
 
 	// function methods for resources and param validators
-	validators map[string]ParameterValidator
-	methods    map[string]ResourceMethod
+	validators *map[string]ParameterValidator
+	methods    *map[string]ResourceMethod
 }
 
 func NewController(bkd Backend) *Controller {
@@ -45,7 +45,7 @@ func (c *Controller) ParseBackendConfigs(codes, routes, messages string) {
 	ParseJSON(messages, &c.messages)
 }
 
-func (c *Controller) SetMethods(validators map[string]ParameterValidator, methods map[string]ResourceMethod) {
+func (c *Controller) SetMethods(validators *map[string]ParameterValidator, methods *map[string]ResourceMethod) {
 	c.validators = validators
 	c.methods = methods
 }

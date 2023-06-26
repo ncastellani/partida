@@ -87,9 +87,9 @@ func (c *Controller) handleRequest(r *Request) Response {
 	r.extractAuthorizationToken()
 	r.authorizeUser(&c.backend)
 	r.parsePayload()
-	r.validateResourceParameters(&c.validators)
+	r.validateResourceParameters(c.validators)
 	r.callBackendPreExecution(&c.backend)
-	r.callMethod(&c.methods)
+	r.callMethod(c.methods)
 	r.callBackendPostExecution(&c.backend)
 
 	r.Logger.Printf("finished the request handler job")
