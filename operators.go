@@ -32,7 +32,7 @@ func (r *Request) determineResource(routes *map[string]map[string]Resource) {
 	// check for route existence at the controller
 	if _, ok := (*routes)[r.Path]; !ok {
 		r.Logger.Printf("route not found [path: %v]", r.Path)
-		r.updateResult("GN100", "", Empty)
+		r.updateResult("GEN-0004", "", Empty)
 		return
 	}
 
@@ -45,11 +45,11 @@ func (r *Request) determineResource(routes *map[string]map[string]Resource) {
 		// return an OK response for OPTIONS verb validations
 		if r.Method == "OPTIONS" {
 			r.Logger.Printf("the current request is an OPTIONS check validation")
-			r.updateResult("GN101", "", Empty)
+			r.updateResult("GEN-0005", "", Empty)
 			return
 		}
 
-		r.updateResult("GN102", "", Empty)
+		r.updateResult("GEN-0006", "", Empty)
 		return
 	} else {
 		r.Resource = v
@@ -77,7 +77,7 @@ func (r *Request) verifyNetwork() {
 
 	if (r.Resource.Network.Default == "deny" && !addrInExceptions) || (r.Resource.Network.Default == "allow" && addrInExceptions) {
 		r.Logger.Printf("resource does not allow this user IP [ip: %v]", r.IP)
-		r.updateResult("GN103", "", Empty)
+		r.updateResult("GEN-0007", "", Empty)
 		return
 	}
 
@@ -100,7 +100,7 @@ func (r *Request) extractAuthorizationToken() {
 		token = v
 	} else {
 		r.Logger.Println("'Authorization' header is not present or does not holds any content")
-		r.updateResult("GN104", "", Empty)
+		r.updateResult("GEN-0008", "", Empty)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (r *Request) extractAuthorizationToken() {
 	authHeader := strings.Fields(token)
 	if len(authHeader) == 1 {
 		r.Logger.Println("the \"Authorization\" header is present but does not use the correct format")
-		r.updateResult("GN105", "", Empty)
+		r.updateResult("GEN-0009", "", Empty)
 		return
 	}
 
@@ -160,17 +160,17 @@ func (r *Request) parsePayload() {
 		if r.ContentType == "json" {
 			err = json.Unmarshal(r.Input, &bodyParameters)
 			if err != nil {
-				r.updateResult("GN107", "", err)
+				r.updateResult("GEN-0011", "", err)
 				return
 			}
 		} else {
-			r.updateResult("GN106", "", r.Headers["Accept"])
+			r.updateResult("GEN-0010", "", r.Headers["Accept"])
 			return
 		}
 
 		// check if the inputted body is an associative map
 		if !IsAssociative(bodyParameters) {
-			r.updateResult("GN108", "", Empty)
+			r.updateResult("GEN-0012", "", Empty)
 			return
 		}
 
@@ -275,7 +275,7 @@ func (r *Request) parsePayload() {
 	if len(invalid) > 0 || len(missing) > 0 {
 		r.Logger.Printf("this request has invalid or missing parameters [invalid: %v] [missing: %v]", len(invalid), len(missing))
 
-		r.updateResult("GN109", "", struct {
+		r.updateResult("GEN-0013", "", struct {
 			Missing *[]ResourceParameter `json:"missing"`
 			Invalid *[]ResourceParameter `json:"invalid"`
 		}{
@@ -355,7 +355,7 @@ func (r *Request) callMethod(methods *map[string]ResourceMethod) {
 	// check if the resource method function exists
 	if _, ok := (*methods)[r.Resource.ResourceMethod]; !ok {
 		r.Logger.Println("resource method function does not exists at the handlers map")
-		r.updateResult("GN2", "", r.Resource.ResourceMethod)
+		r.updateResult("GEN-0001", "", r.Resource.ResourceMethod)
 		return
 	}
 
@@ -365,7 +365,7 @@ func (r *Request) callMethod(methods *map[string]ResourceMethod) {
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			r.Logger.Printf("resource method function panicked [err: %v]", rcv)
-			r.Result = HandlerResponse{"GN1", "", rcv}
+			r.Result = HandlerResponse{"SE", "", rcv}
 		}
 	}()
 

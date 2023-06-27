@@ -71,7 +71,7 @@ func (c *Controller) handleRequest(r *Request) Response {
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			r.Logger.Printf("request operator panicked [err: %v]", rcv)
-			r.Result = HandlerResponse{"GN1", "", rcv}
+			r.Result = HandlerResponse{"SE", "", rcv}
 		}
 	}()
 
@@ -102,7 +102,7 @@ func (c *Controller) makeResponse(r *Request) Response {
 	r.Logger.Printf("starting the response assemble [code: %v] [customMessage: %v]", r.Result.Code, r.Result.CustomMessage)
 
 	// check if the response code exists and fetch its data
-	code := generalCodes["GN3"]
+	code := generalCodes["GEN-0002"]
 
 	if v, ok := c.codes[r.Result.Code]; ok {
 		code = v
@@ -158,7 +158,7 @@ func (c *Controller) makeResponse(r *Request) Response {
 
 	if err != nil {
 		r.Logger.Fatalf("error while marshaling JSON/XML with response [err: %v]", err)
-		return Response{HTTPCode: generalCodes["GN4"].HTTPCode, Content: []byte{}, Headers: nil}
+		return Response{HTTPCode: generalCodes["GEN-0003"].HTTPCode, Content: []byte{}, Headers: nil}
 	}
 
 	r.Logger.Println("API response assembled. returning HTTP response")
