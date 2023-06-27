@@ -10,12 +10,12 @@ type Resource struct {
 
 // ResourceParameter is an parameter spec for the resource item
 type ResourceParameter struct {
-	QueryParameter bool     `json:"query_parameter"`
 	Name           string   `json:"name"`       // parameter name
 	Kind           string   `json:"kind"`       // parameter type (string/number/enum)
 	Required       bool     `json:"required"`   // is required
 	MaxLength      int      `json:"max_length"` // max length of the string (0 for none)
-	Options        []string `json:"options"`    // if type enum, what are the options?
+	QueryParameter bool     `json:"query_parameter"`
+	Options        []string `json:"options"` // if type enum, what are the options?
 
 	Validators []string `json:"validators"` // custom functions to validate a parameter
 }

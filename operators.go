@@ -371,6 +371,11 @@ func (r *Request) callMethod(methods *map[string]ResourceMethod) {
 
 	r.Result = (*methods)[r.Resource.ResourceMethod](r)
 
+	// add the OK code if the return code is empty
+	if r.Result.Code == "" {
+		r.Result.Code = "OK"
+	}
+
 	r.Logger.Println("-- resource method execution ended --")
 
 	r.Logger.Println("sucessfully executed the resource method function")
