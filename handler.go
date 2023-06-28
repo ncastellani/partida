@@ -54,6 +54,9 @@ type Request struct {
 	Parameters     *map[string]interface{} // parsed parameters
 	Resource       Resource                // resource data
 	Result         HandlerResponse         // resource handler result
+
+	// backend data
+	Token interface{}
 }
 
 // call the request validation methods and the resource function
