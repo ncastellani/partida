@@ -57,6 +57,7 @@ type Request struct {
 
 	// backend data
 	Token interface{}
+	User  interface{}
 }
 
 // call the request validation methods and the resource function
