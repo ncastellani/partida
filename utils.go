@@ -52,7 +52,7 @@ func StringInSlice(a string, list []string) bool {
 
 // RandomString generate a random string of the passed length
 func RandomString(length int) string {
-	charset := "abcdefghijklmnopqrstuvwxyz0123456789"
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	b := make([]byte, length)
