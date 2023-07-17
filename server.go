@@ -53,6 +53,10 @@ func (c *Controller) HandlerForHTTP(w http.ResponseWriter, e *http.Request) {
 	res := c.handleRequest(&r)
 
 	// append the request ID
+	if len(res.Headers) == 0 {
+		res.Headers = make(map[string]string)
+	}
+
 	res.Headers["x-request-id"] = r.ID
 
 	// set the response headers on the request
@@ -100,6 +104,10 @@ func (c *Controller) HandlerForAWSLambda(e events.APIGatewayV2HTTPRequest) (even
 	r.Logger.Println("DONE")
 
 	// append the request ID
+	if len(res.Headers) == 0 {
+		res.Headers = make(map[string]string)
+	}
+
 	res.Headers["x-request-id"] = r.ID
 
 	return events.APIGatewayV2HTTPResponse{
