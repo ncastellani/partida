@@ -72,8 +72,53 @@ func (c *Controller) HandlerForHTTP(w http.ResponseWriter, e *http.Request) {
 
 }
 
+// HandlerForAWSLambda handle an inbound AWS Lambda request
+func (c *Controller) HandlerForAWSLambda(e events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+
+	// generate the request with the relevant data
+	r := Request{
+		ID:      e.RequestContext.RequestID,
+		IP:      e.RequestContext.Identity.SourceIP,
+		Method:  e.RequestContext.HTTPMethod,
+		Query:   e.QueryStringParameters,
+		Headers: e.Headers,
+	}
+
+	// parse the path for getting the action
+	r.Path = "index"
+
+	if e.Path != "/" {
+		r.Path = e.Path[1:]
+	}
+
+	// get the request input body also handling Base64 encoded bodies
+	if e.IsBase64Encoded {
+		r.Input, _ = base64.StdEncoding.DecodeString(e.Body)
+	} else {
+		r.Input = []byte(e.Body)
+	}
+
+	// assemble and perform the request validation and method
+	res := c.handleRequest(&r)
+
+	r.Logger.Println("DONE")
+
+	// append the request ID
+	if len(res.Headers) == 0 {
+		res.Headers = make(map[string]string)
+	}
+
+	res.Headers["x-request-id"] = r.ID
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: res.HTTPCode,
+		Headers:    res.Headers,
+		Body:       string(res.Content),
+	}, nil
+}
+
 // HandlerForAWSLambda handle an inbound AWS Lambda request (via API Gateway v2)
-func (c *Controller) HandlerForAWSLambda(e events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func (c *Controller) HandlerForAWSLambdaV2(e events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 
 	// generate the request with the relevant data
 	r := Request{
