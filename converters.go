@@ -29,7 +29,7 @@ func ExtractStringArray(data interface{}) (v []string) {
 	switch data.(type) {
 	case []interface{}:
 		for _, e := range data.([]interface{}) {
-			switch data.(type) {
+			switch e.(type) {
 			case string:
 				v = append(v, e.(string))
 			}
