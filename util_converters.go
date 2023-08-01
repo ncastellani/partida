@@ -1,6 +1,10 @@
 package partida
 
-import "gopkg.in/guregu/null.v4"
+import (
+	"time"
+
+	"gopkg.in/guregu/null.v4"
+)
 
 func ExtractNullError(err error) (v null.String) {
 	if err != nil {
@@ -21,6 +25,15 @@ func ExtractNullString(data interface{}) (v null.String) {
 	switch data.(type) {
 	case string:
 		v = null.NewString(data.(string), true)
+	}
+	return v
+}
+
+func ExtractNullTime(data interface{}) (v null.Time) {
+	switch data.(type) {
+	case string:
+		date, _ := time.Parse("2006-01-02T15:04:05", data.(string))
+		v = null.NewTime(date, true)
 	}
 	return v
 }
