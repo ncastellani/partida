@@ -2,6 +2,7 @@ package partida
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"math/rand"
@@ -68,6 +69,14 @@ func RandomString(length int) string {
 // StringToSHA256 convert a string into its SHA256 hash
 func StringToSHA256(str string) string {
 	h := sha256.New()
+	h.Write([]byte(str))
+	final := hex.EncodeToString(h.Sum(nil))
+	return final
+}
+
+// StringToSHA512 convert a string into its SHA512 hash
+func StringToSHA512(str string) string {
+	h := sha512.New()
 	h.Write([]byte(str))
 	final := hex.EncodeToString(h.Sum(nil))
 	return final
