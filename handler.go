@@ -64,7 +64,7 @@ type Request struct {
 func (c *Controller) handleRequest(r *Request) Response {
 
 	// generate the logger for this request
-	r.Logger = log.New(c.writer, fmt.Sprintf("%v(%v) > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
+	r.Logger = log.New(c.writer, fmt.Sprintf("[%v]%v > ", r.ID, r.Path), log.LstdFlags|log.Lmsgprefix)
 
 	r.Logger.Printf("request recieved [method: %v] [ip: %v]", r.Method, r.IP)
 
