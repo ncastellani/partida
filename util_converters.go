@@ -32,7 +32,19 @@ func ExtractNullString(data interface{}) (v null.String) {
 func ExtractNullTime(data interface{}) (v null.Time) {
 	switch data.(type) {
 	case string:
-		date, _ := time.Parse("2006-01-02T15:04:05", data.(string))
+		date, err := time.Parse("2006-01-02T15:04:05", data.(string))
+		if err != nil {
+			date, err = time.Parse("2006-01-02T15:04:05Z", data.(string))
+			if err != nil {
+				date, err = time.Parse("2006-01-02T15:04:05-03:00", data.(string))
+				if err != nil {
+					date, err = time.Parse("2006-01-02T15:04:05+03:00", data.(string))
+					if err != nil {
+						return
+					}
+				}
+			}
+		}
 		v = null.NewTime(date, true)
 	}
 	return v
