@@ -6,13 +6,22 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bytedance/sonic"
 )
 
+type File struct {
+	Path    string
+	IsDir   bool
+	ModTime time.Time
+	Name    string
+	Size    int64
+}
+
 // ListFolderFiles
 // take a folder path and walk through each file on the folder.
-func ListFolderFiles(folder string) (files []os.FileInfo, err error) {
+func ListFolderFiles(folder string) (files []File, err error) {
 
 	// walk through each file on the folder
 	err = filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
@@ -21,7 +30,13 @@ func ListFolderFiles(folder string) (files []os.FileInfo, err error) {
 		}
 
 		// append this file/folder into the list
-		files = append(files, info)
+		files = append(files, File{
+			Path:    path,
+			IsDir:   info.IsDir(),
+			ModTime: info.ModTime(),
+			Name:    info.Name(),
+			Size:    info.Size(),
+		})
 
 		return nil
 	})

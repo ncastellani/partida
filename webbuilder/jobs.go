@@ -19,7 +19,7 @@ import (
 // runJob
 // prepare the files and call the operators to run a compilation job.
 // will panic if failure.
-func (c *BuildConfig) runJob(job, folder, rebaseTo string, includeSuffix bool, suffixes []string, op func(l *log.Logger, f os.FileInfo, newPath string)) {
+func (c *BuildConfig) runJob(job, folder, rebaseTo string, includeSuffix bool, suffixes []string, op func(l *log.Logger, f utilfunc.File, newPath string)) {
 
 	// generate a job logger
 	l := log.New(c.IODebug, fmt.Sprintf("[job: %v] ", job), log.LstdFlags|log.Lmsgprefix)
@@ -39,7 +39,7 @@ func (c *BuildConfig) runJob(job, folder, rebaseTo string, includeSuffix bool, s
 	for _, f := range files {
 
 		// skip folders
-		if f.IsDir() {
+		if f.IsDir {
 			continue
 		}
 
@@ -47,14 +47,14 @@ func (c *BuildConfig) runJob(job, folder, rebaseTo string, includeSuffix bool, s
 			skip := false
 			for _, sf := range suffixes {
 				if includeSuffix {
-					if !strings.HasSuffix(f.Name(), sf) {
+					if !strings.HasSuffix(f.Path, sf) {
 						skip = true
 					} else {
 						skip = false
 						break
 					}
 				} else {
-					if strings.HasSuffix(f.Name(), sf) {
+					if strings.HasSuffix(f.Path, sf) {
 						skip = true
 					} else {
 						skip = false
@@ -69,9 +69,9 @@ func (c *BuildConfig) runJob(job, folder, rebaseTo string, includeSuffix bool, s
 		}
 
 		// rebase its path and generate a logger for this file
-		newPath := strings.Replace(f.Name(), folder, c.DistributionPath+rebaseTo, 1)
+		newPath := strings.Replace(f.Path, folder, c.DistributionPath+rebaseTo, 1)
 
-		fl := log.New(c.IODebug, fmt.Sprintf("%v(%v) ", l.Prefix(), f.Name()), l.Flags())
+		fl := log.New(c.IODebug, fmt.Sprintf("%v(%v) ", l.Prefix(), f.Path), l.Flags())
 		fl.Printf("rebased file path [rebased: %v]", newPath)
 
 		// call the operator function
@@ -92,10 +92,10 @@ func (c *BuildConfig) ImportLanguages() {
 		"/assets/lang/",
 		true,
 		[]string{".json"},
-		func(l *log.Logger, f os.FileInfo, newPath string) {
+		func(l *log.Logger, f utilfunc.File, newPath string) {
 
 			// read the JSON file
-			langRaw, err := utilfunc.ReadJSONFile(f.Name(), &Language{})
+			langRaw, err := utilfunc.ReadJSONFile(f.Path, &Language{})
 			if err != nil {
 				l.Panicf("failed to read JSON file from OS [err: %v]", err)
 			}
@@ -133,8 +133,8 @@ func (c *BuildConfig) CopyStatic() {
 		"/",
 		true,
 		[]string{},
-		func(l *log.Logger, f os.FileInfo, newPath string) {
-			err := utilfunc.CopyFile(l, f.Name(), newPath)
+		func(l *log.Logger, f utilfunc.File, newPath string) {
+			err := utilfunc.CopyFile(l, f.Path, newPath)
 			if err != nil {
 				panic(err)
 			}
@@ -154,8 +154,8 @@ func (c *BuildConfig) CopyUnhandableAssets() {
 		"/assets/",
 		false,
 		[]string{".css", ".js", ".json"},
-		func(l *log.Logger, f os.FileInfo, newPath string) {
-			err := utilfunc.CopyFile(l, f.Name(), newPath)
+		func(l *log.Logger, f utilfunc.File, newPath string) {
+			err := utilfunc.CopyFile(l, f.Path, newPath)
 			if err != nil {
 				panic(err)
 			}
@@ -175,7 +175,7 @@ func (c *BuildConfig) MinifyAssets() {
 		"/assets/",
 		true,
 		[]string{".css", ".js", ".json"},
-		func(l *log.Logger, f os.FileInfo, newPath string) {
+		func(l *log.Logger, f utilfunc.File, newPath string) {
 
 			// determine the MIME kind
 			mimekind := ""
@@ -202,7 +202,7 @@ func (c *BuildConfig) MinifyAssets() {
 			}
 
 			// read the file
-			sourceFile, err := os.Open(f.Name())
+			sourceFile, err := os.Open(f.Path)
 			if err != nil {
 				l.Panicf("failed to read asset file from OS [err: %v]", err)
 			}
@@ -254,11 +254,11 @@ func (c *BuildConfig) RenderViews() {
 	// generate a list of just HTML file paths
 	var templatableFiles []string
 	for _, f := range files {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".html") {
+		if f.IsDir || !strings.HasSuffix(f.Path, ".html") {
 			continue
 		}
 
-		templatableFiles = append(templatableFiles, f.Name())
+		templatableFiles = append(templatableFiles, f.Path)
 	}
 
 	// !! minify
