@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bytedance/sonic"
@@ -69,7 +70,7 @@ func (c *BuildConfig) runJob(job, folder, rebaseTo string, includeSuffix bool, s
 		}
 
 		// rebase its path and generate a logger for this file
-		newPath := strings.Replace(f.Path, folder, c.DistributionPath+rebaseTo, 1)
+		newPath := strings.Replace(filepath.ToSlash(f.Path), folder, c.DistributionPath+rebaseTo, 1)
 
 		fl := log.New(c.IODebug, fmt.Sprintf("%v(%v) ", l.Prefix(), f.Path), l.Flags())
 		fl.Printf("rebased file path [rebased: %v]", newPath)
@@ -275,7 +276,7 @@ func (c *BuildConfig) RenderViews() {
 		l := log.New(lg.Writer(), fmt.Sprintf("%v(%v) ", lg.Prefix(), path), lg.Flags())
 
 		// rebase the file path
-		newPath := strings.Replace(path, c.Folder.Views, c.DistributionPath+"/", 1)
+		newPath := strings.Replace(filepath.ToSlash(path), c.Folder.Views, c.DistributionPath+"/", 1)
 
 		l.Printf("rebased file path [rebased: %v]", newPath)
 
@@ -285,21 +286,13 @@ func (c *BuildConfig) RenderViews() {
 			l.Panicf("failed to parse templates [err: %v]", err)
 		}
 
-		// determine if the current file is the app
-		isBoxed := true
-		if strings.Split(path, "/")[2] == "index.html" {
-			isBoxed = false
-		}
-
 		// !! execute the template
 		renderedFile := bytes.NewBuffer([]byte{})
 		err = tpl.ExecuteTemplate(renderedFile, "base", struct {
-			Boxed   bool
-			BuildID string
+			Version string
 			T       map[string]string
 		}{
-			Boxed:   isBoxed,
-			BuildID: c.Version,
+			Version: c.Version,
 			T:       c.languages[0].Translations,
 		})
 

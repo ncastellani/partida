@@ -106,7 +106,7 @@ func WriteFile(l *log.Logger, path string, content *[]byte) (err error) {
 	l.Println("writing file...")
 
 	// determine the folder structure
-	pathSplitted := strings.Split(path, "/")
+	pathSplitted := strings.Split(filepath.ToSlash(path), "/")
 	folder := strings.Join(pathSplitted[:len(pathSplitted)-1], "/")
 
 	l.Printf("determined the file tree [folderTree: %v]", folder)
