@@ -13,6 +13,7 @@ import (
 	"github.com/ncastellani/partida/utilfunc"
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/css"
+	"github.com/tdewolff/minify/v2/js"
 	"github.com/tdewolff/minify/v2/json"
 )
 
@@ -153,7 +154,7 @@ func (c *BuildConfig) CopyUnhandableAssets() {
 		c.Folder.Assets,
 		"/assets/",
 		false,
-		[]string{".css", ".json"},
+		[]string{".css", ".js", ".json"},
 		func(l *log.Logger, f utilfunc.File, newPath string) {
 			err := utilfunc.CopyFile(l, f.Path, newPath)
 			if err != nil {
@@ -174,13 +175,15 @@ func (c *BuildConfig) MinifyAssets() {
 		c.Folder.Assets,
 		"/assets/",
 		true,
-		[]string{".css", ".json"},
+		[]string{".css", ".js", ".json"},
 		func(l *log.Logger, f utilfunc.File, newPath string) {
 
 			// determine the MIME kind
 			mimekind := ""
 
-			if strings.HasSuffix(newPath, ".json") {
+			if strings.HasSuffix(newPath, ".js") {
+				mimekind = "text/javascript"
+			} else if strings.HasSuffix(newPath, ".json") {
 				mimekind = "application/json"
 			} else {
 				mimekind = "text/css"
@@ -193,6 +196,8 @@ func (c *BuildConfig) MinifyAssets() {
 			switch mimekind {
 			case "text/css":
 				m.AddFunc("text/css", css.Minify)
+			case "text/javascript":
+				m.AddFunc("text/javascript", js.Minify)
 			case "application/json":
 				m.AddFunc("application/json", json.Minify)
 			}
