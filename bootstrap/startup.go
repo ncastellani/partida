@@ -12,7 +12,7 @@ import (
 type Application struct {
 	Path    string // directory this app is running at
 	Version string // current application version
-	Config  *interface{}
+	Config  map[string]interface{}
 
 	ExecKind    string // execution type
 	ExecHandler string // execution handler type
@@ -21,7 +21,7 @@ type Application struct {
 }
 
 // !! will panic if failure.
-func NewApplication(l *log.Logger, name, configPath string, configStruct *interface{}) (app Application) {
+func NewApplication(l *log.Logger, config string) (app Application) {
 
 	// current directory full path
 	pwd, err := filepath.Abs(filepath.Dir(os.Args[0]))
@@ -48,7 +48,7 @@ func NewApplication(l *log.Logger, name, configPath string, configStruct *interf
 	}
 
 	// parse the general config files
-	err = utilfunc.ParseJSON(app.Path+configPath, app.Config)
+	err = utilfunc.ParseJSON(app.Path+config, app.Config)
 	if err != nil {
 		l.Fatalf("failed to parse the config JSON [err: %v]", err)
 	}
