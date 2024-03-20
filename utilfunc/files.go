@@ -1,6 +1,8 @@
 package utilfunc
 
 import (
+	"bytes"
+	"compress/gzip"
 	"io"
 	"log"
 	"os"
@@ -142,4 +144,59 @@ func WriteFile(l *log.Logger, path string, content *[]byte) (err error) {
 	l.Println("the file was written sucessfully")
 
 	return
+}
+
+// GZipFile
+// take an file content as a bytes pointer and GZip
+// those data, returning the operation output as bytes.
+func GzipFile(input *[]byte) (output *[]byte, err error) {
+
+	// generate a byte buffer to print out the compressed data
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+
+	// write the Gzip file
+	_, err = gz.Write(*input)
+	if err != nil {
+		return
+	}
+
+	if err = gz.Flush(); err != nil {
+		return
+	}
+
+	if err = gz.Close(); err != nil {
+		return
+	}
+
+	// get the bytes of the buffer
+	compressedData := b.Bytes()
+
+	return &compressedData, err
+}
+
+// UnGzipFile
+// take GZipped file as a pointer the bytes and undo the
+// zip operation, returning the uncompressed data as bytes.s
+func UnGzipFile(input *[]byte) (output *[]byte, err error) {
+
+	// gzip-read the bytes data as a buffer
+	b := bytes.NewBuffer(*input)
+
+	var r io.Reader
+	r, err = gzip.NewReader(b)
+	if err != nil {
+		return
+	}
+
+	var resB bytes.Buffer
+	_, err = resB.ReadFrom(r)
+	if err != nil {
+		return
+	}
+
+	// get the ungzipped data
+	result := resB.Bytes()
+
+	return &result, err
 }
