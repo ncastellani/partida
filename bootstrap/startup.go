@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,6 +16,22 @@ type Application struct {
 	Version string                 // current application version
 	Config  map[string]interface{} // application general config
 	Vars    map[string]string      // the config-requested environment variables
+
+	// all of the the interfaces below this comment must be defined by the
+	// client application after calling the NewApplication function
+
+	Backend Backend         // map to the client application interfaces
+	Codes   map[string]Code // map of the available response codes
+
+	// API settings
+	APILogsWriter io.Writer
+	APIMethods    map[string]APIResourceMethod
+	APIRoutes     map[string]map[string]APIResource
+	APIValidators map[string]APIParameterValidator
+
+	// Queue settings
+	QueueLogsWriter io.Writer
+	QueueMethods    map[string]QueueMethod
 }
 
 // NewApplication
