@@ -84,6 +84,8 @@ func NewApplication(l *log.Logger, config string) (app Application) {
 // map, if not, an fatal error will occur.
 // will panic if failure.
 func (app *Application) CheckForVariables(list []string) {
+	app.Vars = make(map[string]string)
+
 	for _, rv := range list {
 		v := os.Getenv(rv)
 		if v == "" {
