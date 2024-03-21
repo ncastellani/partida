@@ -24,9 +24,9 @@ type Application struct {
 	Codes   map[string]Code // map of the available response codes
 
 	// API settings
+	APIRoutes     map[string]map[string]APIResource // (done by LoadJSONFiles) path to HTTP method to function method map
 	APILogsWriter io.Writer
 	APIMethods    map[string]APIResourceMethod
-	APIRoutes     map[string]map[string]APIResource
 	APIValidators map[string]APIParameterValidator
 
 	// Queue settings
@@ -91,4 +91,36 @@ func (app *Application) CheckForVariables(list []string) {
 
 		app.Vars[rv] = v
 	}
+}
+
+// LoadJSONFiles
+// take the relative file path of the API codes and routes
+// JSON file, import those contents and set them on the application.
+// the imported codes are merged with the default ones.
+// will panic if failure.
+func (app *Application) LoadJSONFiles(codes, routes string) {
+	app.Logger.Println("loading the JSON files with the codes and routes...")
+
+	// import the API codes
+	var parsedCodes map[string]Code
+
+	err := utilfunc.ParseJSON(app.Path+codes, &parsedCodes)
+	if err != nil {
+		app.Logger.Fatalf("failed to import codes JSON file [err: %v]", err)
+	}
+
+	// merge the default codes with the imported ones
+	for k, v := range DefaultCodes {
+		parsedCodes[k] = v
+	}
+
+	// set the parsed codes in the application
+	app.Codes = parsedCodes
+
+	// load the API routes to the application
+	err = utilfunc.ParseJSON(app.Path+routes, &app.APIRoutes)
+	if err != nil {
+		app.Logger.Fatalf("failed to import routes JSON file [err: %v]", err)
+	}
+
 }
