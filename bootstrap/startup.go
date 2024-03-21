@@ -10,17 +10,18 @@ import (
 )
 
 type Application struct {
-	Path    string // directory this app is running at
-	Version string // current application version
-	Config  map[string]interface{}
-
-	ExecKind    string // execution type
-	ExecHandler string // execution handler type
-	Region      string // current region this server is running
-	HTTPPort    string // server port to expose the HTTP handler
+	Logger  *log.Logger            // default application logger
+	Path    string                 // path to the directory that this app is running at
+	Version string                 // current application version
+	Config  map[string]interface{} // application general config
+	Vars    map[string]string      // the config-requested environment variables
 }
 
-// !! will panic if failure.
+// NewApplication
+// recieve an logger and a file path to the config JSON
+// file and determine the required information to initiate an API
+// and queue handler applcation.
+// will panic if failure.
 func NewApplication(l *log.Logger, config string) (app Application) {
 
 	// current directory full path
@@ -48,7 +49,7 @@ func NewApplication(l *log.Logger, config string) (app Application) {
 	}
 
 	// parse the general config files
-	err = utilfunc.ParseJSON(app.Path+config, app.Config)
+	err = utilfunc.ParseJSON(app.Path+config, &app.Config)
 	if err != nil {
 		l.Fatalf("failed to parse the config JSON [err: %v]", err)
 	}
@@ -56,4 +57,21 @@ func NewApplication(l *log.Logger, config string) (app Application) {
 	log.Println("configuration file parsed and imported")
 
 	return
+}
+
+// CheckForVariables
+// take a list of environment variables names and
+// check if they have a defined value on the environment.
+// if the variable is available, it is set at the app.Vars
+// map, if not, an fatal error will occur.
+// will panic if failure.
+func (app *Application) CheckForVariables(list []string) {
+	for _, rv := range list {
+		v := os.Getenv(rv)
+		if v == "" {
+			log.Fatalf("an required environment variable is not set [var: %v]", rv)
+		}
+
+		app.Vars[rv] = v
+	}
 }
