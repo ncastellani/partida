@@ -40,11 +40,12 @@ type Application struct {
 // and queue handler applcation.
 // will panic if failure.
 func NewApplication(l *log.Logger, config string) (app Application) {
+	app.Logger = l
 
 	// current directory full path
 	pwd, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		log.Fatalf("failed to determine the current execution path [err: %v]", err)
+		app.Logger.Fatalf("failed to determine the current execution path [err: %v]", err)
 	}
 
 	app.Path = pwd
@@ -68,10 +69,10 @@ func NewApplication(l *log.Logger, config string) (app Application) {
 	// parse the general config files
 	err = utilfunc.ParseJSON(app.Path+config, &app.Config)
 	if err != nil {
-		l.Fatalf("failed to parse the config JSON [err: %v]", err)
+		app.Logger.Fatalf("failed to parse the config JSON [err: %v]", err)
 	}
 
-	log.Println("configuration file parsed and imported")
+	app.Logger.Println("configuration file parsed and imported")
 
 	return
 }
@@ -86,7 +87,7 @@ func (app *Application) CheckForVariables(list []string) {
 	for _, rv := range list {
 		v := os.Getenv(rv)
 		if v == "" {
-			log.Fatalf("an required environment variable is not set [var: %v]", rv)
+			app.Logger.Fatalf("an required environment variable is not set [var: %v]", rv)
 		}
 
 		app.Vars[rv] = v
