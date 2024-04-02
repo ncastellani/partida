@@ -92,6 +92,7 @@ func (app *Application) CheckForVariables(list []string) {
 			app.Logger.Fatalf("an required environment variable is not set [var: %v]", rv)
 		}
 
+		app.Logger.Printf("found required environment variable [var: %v]", rv)
 		app.Vars[rv] = v
 	}
 }
