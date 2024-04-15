@@ -61,8 +61,8 @@ func AppendToQueue(l *log.Logger, key string, priority int, category string, dat
 
 	// send to the queue
 	out, err := QUEUE.SendMessage(&sqs.SendMessageInput{
-		QueueUrl:               aws.String(os.Getenv("SQS_SERVICE_QUEUE")),
-		MessageAttributes:      map[string]*sqs.MessageAttributeValue{"Category": {DataType: aws.String("String"), StringValue: &category}},
+		QueueUrl:               aws.String(os.Getenv("APP_QUEUE")),
+		MessageAttributes:      map[string]*sqs.MessageAttributeValue{"METHOD": {DataType: aws.String("String"), StringValue: &category}},
 		MessageBody:            &body,
 		MessageDeduplicationId: &dedup,
 		MessageGroupId:         aws.String(fmt.Sprintf("%v-%v", key, priority)),

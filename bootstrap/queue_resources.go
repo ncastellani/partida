@@ -4,11 +4,10 @@ import "log"
 
 // !!
 type QueueEvent struct {
-	Name    string
-	ID      string
-	Logger  *log.Logger
-	Account int
-	Body    map[string]interface{}
+	Name   string
+	ID     string
+	Logger *log.Logger
+	Body   map[string]interface{}
 }
 
 // !!
