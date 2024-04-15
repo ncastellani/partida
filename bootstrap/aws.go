@@ -28,7 +28,7 @@ var AWSSession, _ = session.NewSession(&aws.Config{
 var DB = dynamo.New(AWSSession, &aws.Config{Region: aws.String(regionToAWSRegion[os.Getenv("APP_REGION")])})
 
 // create a session for SQS
-var QUEUE = sqs.New(AWSSession, &aws.Config{Region: aws.String(os.Getenv("SQS_AWS_REGION"))})
+var QUEUE = sqs.New(AWSSession, &aws.Config{Region: aws.String(os.Getenv("APP_QUEUE_REGION"))})
 
 // update the opened AWS connections and the AWS session
 func UpdateAWSConnections() {
