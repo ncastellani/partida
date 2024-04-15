@@ -42,7 +42,7 @@ func UpdateAWSConnections() {
 	})
 
 	DB = dynamo.New(AWSSession, &aws.Config{Region: aws.String(regionToAWSRegion[os.Getenv("APP_REGION")])})
-	QUEUE = sqs.New(AWSSession, &aws.Config{Region: aws.String(os.Getenv("SQS_AWS_REGION"))})
+	QUEUE = sqs.New(AWSSession, &aws.Config{Region: aws.String(os.Getenv("APP_QUEUE_REGION"))})
 }
 
 // add an event into the SQS queue
