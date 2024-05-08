@@ -336,6 +336,11 @@ func (c *BuildConfig) UpdateWorker() {
 	for _, f := range files {
 		if !f.IsDir {
 			path := strings.Replace(filepath.ToSlash(f.Path), c.DistributionPath, "", 1)
+
+			if path == "/version.txt" {
+				continue
+			}
+
 			paths = append(paths, path)
 		}
 	}
@@ -365,4 +370,18 @@ func (c *BuildConfig) UpdateWorker() {
 		panic(err)
 	}
 
+}
+
+// WriteVersionFile
+// create a file "version.txt" at the distribution folder with the
+// build version.
+// will panic if failure.
+func (c *BuildConfig) WriteVersionFile() {
+	lg := log.New(c.IODebug, "[job: versionFile] ", log.LstdFlags|log.Lmsgprefix)
+	dataBytes := []byte(c.Version)
+
+	err := utilfunc.WriteFile(lg, c.DistributionPath+"/version.txt", &dataBytes)
+	if err != nil {
+		lg.Panicf("failed to write the version file [err: %v]", err)
+	}
 }
