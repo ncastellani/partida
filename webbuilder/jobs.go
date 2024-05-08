@@ -313,3 +313,56 @@ func (c *BuildConfig) RenderViews() {
 	}
 
 }
+
+// UpdateWorker
+// will list all the files at the distribution folder, then,
+// get the worker.js file from the static folder, replace the variables
+// at the worker file for use by the JS as a ServiceWorker.
+// at the end, overwrite the worker.js file at the distribution folder.
+// will panic if failure.
+func (c *BuildConfig) UpdateWorker() {
+
+	// setup a logger for this job
+	lg := log.New(c.IODebug, "[job: worker] ", log.LstdFlags|log.Lmsgprefix)
+	lg.Println("starting the worker.js compile procedures...")
+
+	// read all the files from the dist directory
+	files, err := utilfunc.ListFolderFiles(c.DistributionPath)
+	if err != nil {
+		lg.Panicf("failed to list folder files [err: %v]", err)
+	}
+
+	var paths []string
+	for _, f := range files {
+		if !f.IsDir {
+			path := strings.Replace(f.Path, c.DistributionPath, "", 1)
+			paths = append(paths, path)
+		}
+	}
+
+	// join the file names into JS format
+	toCache := strings.Join(paths, "',\n'")
+
+	lg.Println("assembled the JS format")
+
+	// read the JS file into a string
+	dataRaw, err := os.ReadFile(c.Folder.Static + "/worker.js")
+	if err != nil {
+		lg.Panicf("failed to read worker file into string [err: %v]", err)
+	}
+
+	// update the worker file values
+	data := string(dataRaw)
+	data = strings.ReplaceAll(data, "{{tocache}}", toCache)
+	data = strings.ReplaceAll(data, "{{version}}", c.Version)
+	dataBytes := []byte(data)
+
+	// write lang into distribution
+	lg.Println("writing JS worker to file...")
+
+	err = utilfunc.WriteFile(lg, c.DistributionPath+"/worker.js", &dataBytes)
+	if err != nil {
+		panic(err)
+	}
+
+}
