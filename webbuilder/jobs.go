@@ -335,7 +335,7 @@ func (c *BuildConfig) UpdateWorker() {
 	var paths []string
 	for _, f := range files {
 		if !f.IsDir {
-			path := strings.Replace(filepath.ToSlash(f.Path), c.DistributionPath, "", 1)
+			path := strings.Replace(filepath.ToSlash(f.Path), filepath.ToSlash(c.DistributionPath), "", 1)
 
 			if path == "/version.txt" {
 				continue
