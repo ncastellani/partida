@@ -30,11 +30,10 @@ type Response struct {
 
 // ResponseMeta is the structure of the metadata used on API responses
 type ResponseMeta struct {
-	Code          string            `json:"code"`             // API response code
-	Message       map[string]string `json:"message"`          // response code messages
-	ID            string            `json:"id"`               // request identifier for debug
-	Time          time.Time         `json:"time"`             // request answered datetime
-	CustomMessage map[string]string `json:"resource_message"` // the message returned by the resource
+	ID      string            `json:"id"`      // request identifier for debug
+	Time    time.Time         `json:"time"`    // request answered datetime
+	Code    string            `json:"code"`    // API response code
+	Message map[string]string `json:"message"` // response code messages
 }
 
 // Request is the structure for the request metadata, payload and useful contents
@@ -116,9 +115,6 @@ func (c *Controller) makeResponse(r *Request) Response {
 		}
 	}
 
-	// get the custom message
-	customMsg := c.getCustomMessage(r.Result.CustomMessage)
-
 	// set the CORS, CACHE and content type headers
 	var headers map[string]string = map[string]string{
 		"Content-Type":                 "application/json; charset=utf-8",
@@ -143,11 +139,10 @@ func (c *Controller) makeResponse(r *Request) Response {
 		XMLName: xml.Name{Local: "response"},
 		Data:    r.Result.Data,
 		Meta: ResponseMeta{
-			ID:            r.ID,
-			Time:          time.Now(),
-			Code:          r.Result.Code,
-			Message:       code.Message,
-			CustomMessage: customMsg,
+			ID:      r.ID,
+			Time:    time.Now(),
+			Code:    r.Result.Code,
+			Message: code.Message,
 		},
 	}
 
@@ -168,13 +163,4 @@ func (c *Controller) makeResponse(r *Request) Response {
 	r.Logger.Println("API response assembled. returning HTTP response")
 
 	return Response{HTTPCode: code.HTTPCode, Content: content, Headers: headers}
-}
-
-// return the message values for the passed key
-func (c *Controller) getCustomMessage(key string) (msg map[string]string) {
-	if v, ok := c.messages[key]; ok {
-		msg = v
-	}
-
-	return msg
 }

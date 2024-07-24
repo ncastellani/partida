@@ -18,9 +18,8 @@ type Controller struct {
 	writer  io.Writer // logger writer
 
 	// responses and routes
-	codes    map[string]Code
-	routes   map[string]map[string]Resource
-	messages map[string]map[string]string
+	codes  map[string]Code
+	routes map[string]map[string]Resource
 
 	// function methods for resources and param validators
 	validators *map[string]ParameterValidator
@@ -34,10 +33,9 @@ func NewController(bkd Backend) *Controller {
 	}
 }
 
-func (c *Controller) ParseBackendConfigs(codes, routes, messages string) {
+func (c *Controller) ParseBackendConfigs(codes, routes string) {
 	ParseJSON(codes, &c.codes)
 	ParseJSON(routes, &c.routes)
-	ParseJSON(messages, &c.messages)
 }
 
 func (c *Controller) SetMethods(validators *map[string]ParameterValidator, methods *map[string]ResourceMethod) {
