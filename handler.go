@@ -10,9 +10,8 @@ import (
 
 // HandlerResponse for the general method response structure
 type HandlerResponse struct {
-	Code          string      // return operation code
-	CustomMessage string      // custom action return message
-	Data          interface{} // operation generated data
+	Code string      // return operation code
+	Data interface{} // operation generated data
 }
 
 // Code for the application default response messages and HTTP codes
@@ -30,9 +29,9 @@ type Response struct {
 
 // ResponseMeta is the structure of the metadata used on API responses
 type ResponseMeta struct {
+	Code    string            `json:"code"`    // API response code
 	ID      string            `json:"id"`      // request identifier for debug
 	Time    time.Time         `json:"time"`    // request answered datetime
-	Code    string            `json:"code"`    // API response code
 	Message map[string]string `json:"message"` // response code messages
 }
 
@@ -74,7 +73,7 @@ func (c *Controller) handleRequest(r *Request) Response {
 	defer func() {
 		if rcv := recover(); rcv != nil {
 			r.Logger.Printf("request operator panicked [err: %v]", rcv)
-			r.Result = HandlerResponse{"SE", "", rcv}
+			r.Result = HandlerResponse{"SE", rcv}
 		}
 	}()
 
@@ -102,7 +101,7 @@ func (c *Controller) handleRequest(r *Request) Response {
 func (c *Controller) makeResponse(r *Request) Response {
 	var err error
 
-	r.Logger.Printf("starting the response assemble [code: %v] [customMessage: %v]", r.Result.Code, r.Result.CustomMessage)
+	r.Logger.Printf("starting the response assemble [code: %v]", r.Result.Code)
 
 	// check if the response code exists and fetch its data
 	code := generalCodes["GEN-0002"]
