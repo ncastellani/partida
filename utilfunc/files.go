@@ -3,6 +3,10 @@ package utilfunc
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -176,8 +180,8 @@ func GzipFile(input *[]byte) (output *[]byte, err error) {
 }
 
 // UnGzipFile
-// take GZipped file as a pointer the bytes and undo the
-// zip operation, returning the uncompressed data as bytes.s
+// take a GZipped file as a bytes pointer and undo the
+// GZip operation, returning the uncompressed data as bytes
 func UnGzipFile(input *[]byte) (output *[]byte, err error) {
 
 	// gzip-read the bytes data as a buffer
@@ -199,4 +203,67 @@ func UnGzipFile(input *[]byte) (output *[]byte, err error) {
 	result := resB.Bytes()
 
 	return &result, err
+}
+
+// EncryptFile
+// take in a file passed as an pointer to an array of bytes,
+// uses the passed key as a nounce and encrypt the data
+// return the encrypted data as a pointer
+func EncryptFile(data *[]byte, key string) (encrypted *[]byte, err error) {
+
+	// generate the key
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return
+	}
+
+	// create an array with 16 free bytes at the beginning
+	ciphertext := make([]byte, aes.BlockSize+len(*data))
+	iv := ciphertext[:aes.BlockSize]
+
+	// write the first 16 bytes to fill IV
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	// get encrypted stream
+	stream := cipher.NewCFBEncrypter(block, iv)
+
+	// encrypt data
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], *data)
+
+	return &ciphertext, nil
+}
+
+// DecryptFile
+// take in a file that is encrypted with a nounce, decrypt it
+// and return the contents as bytes
+func DecryptFile(data *[]byte, key string) (decrypted *[]byte, err error) {
+	d := make([]byte, len(*data)-aes.BlockSize)
+	decrypted = &d
+
+	// generate the key
+	block, err := aes.NewCipher([]byte(key))
+	if err != nil {
+		return
+	}
+
+	// check for the data size, if it is smaller than the AES block
+	if len(*data) < aes.BlockSize {
+		return nil, fmt.Errorf("text is too small")
+	}
+
+	// get the 16byte block
+	iv := (*data)[:aes.BlockSize]
+
+	niv := (*data)[aes.BlockSize:]
+	data = &niv
+
+	// get a decrypted stream
+	stream := cipher.NewCFBDecrypter(block, iv)
+
+	// decrypt data
+	stream.XORKeyStream(*decrypted, *data)
+
+	return
 }
